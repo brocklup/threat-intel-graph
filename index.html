@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cyber Threat Intelligence Graph</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Load libraries in correct order: WebCola before cytoscape-cola -->
+    <script src="https://unpkg.com/webcola@3.4.0/WebCola/cola.min.js"></script>
+    <script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
+    <script src="https://unpkg.com/cytoscape-cola@2.5.1/cytoscape-cola.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <h1>🔍 Cyber Threat Intelligence Graph</h1>
+            <div class="header-actions">
+                <button id="settingsBtn" class="btn btn-secondary">⚙️ Settings</button>
+                <button id="clearGraph" class="btn btn-secondary">Clear Graph</button>
+                <button id="exportData" class="btn btn-secondary">Export Data</button>
+                <button id="importData" class="btn btn-secondary">Import Data</button>
+            </div>
+        </header>
+
+        <!-- Main Layout -->
+        <div class="main-layout">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <div class="panel">
+                    <h2>Add Entity</h2>
+                    <form id="addEntityForm">
+                        <div class="form-group">
+                            <label for="entityType">Type:</label>
+                            <select id="entityType" required>
+                                <option value="ip">IP Address</option>
+                                <option value="domain">Domain</option>
+                                <option value="hash">File Hash</option>
+                                <option value="malware">Malware</option>
+                                <option value="threat-actor">Threat Actor</option>
+                                <option value="vulnerability">Vulnerability</option>
+                                <option value="campaign">Campaign</option>
+                                <option value="tool">Tool</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="entityValue">Value:</label>
+                            <input type="text" id="entityValue" required placeholder="e.g., 192.168.1.1">
+                        </div>
+                        <div class="form-group">
+                            <label for="entityDescription">Description:</label>
+                            <textarea id="entityDescription" rows="2"></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Add Entity</button>
+                    </form>
+                    <div id="addEntityStatus" style="margin-top: 0.5rem; font-size: 0.75rem; color: #2ecc71;"></div>
+                </div>
+
+                <div class="panel">
+                    <h2>Add Relationship</h2>
+                    <form id="addRelationshipForm">
+                        <div class="form-group">
+                            <label for="sourceNode">Source:</label>
+                            <select id="sourceNode" required>
+                                <option value="">Select source...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="relationshipType">Relationship:</label>
+                            <select id="relationshipType" required>
+                                <option value="communicates-with">Communicates With</option>
+                                <option value="resolves-to">Resolves To</option>
+                                <option value="downloads">Downloads</option>
+                                <option value="uses">Uses</option>
+                                <option value="exploits">Exploits</option>
+                                <option value="attributed-to">Attributed To</option>
+                                <option value="targets">Targets</option>
+                                <option value="delivers">Delivers</option>
+                                <option value="drops">Drops</option>
+                                <option value="indicates">Indicates</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="targetNode">Target:</label>
+                            <select id="targetNode" required>
+                                <option value="">Select target...</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Add Relationship</button>
+                    </form>
+                </div>
+
+                <div class="panel">
+                    <h2>Sample Data</h2>
+                    <button id="loadSampleData" class="btn btn-secondary">Load Sample Threat Intel</button>
+                    <p class="help-text">Load example APT campaign data to explore</p>
+                </div>
+
+                <div class="panel">
+                    <h2>Layout Options</h2>
+                    <div class="form-group">
+                        <label for="layoutType">Layout:</label>
+                        <select id="layoutType">
+                            <option value="cose">Force-Directed (Cose)</option>
+                            <option value="cola">Force-Directed (Cola)</option>
+                            <option value="circle">Circle</option>
+                            <option value="grid">Grid</option>
+                            <option value="breadthfirst">Hierarchical</option>
+                        </select>
+                    </div>
+                    <button id="applyLayout" class="btn btn-secondary">Apply Layout</button>
+                </div>
+            </aside>
+
+            <!-- Graph Canvas -->
+            <main class="graph-container">
+                <div id="cy"></div>
+                <div class="graph-controls">
+                    <button id="zoomIn" class="control-btn" title="Zoom In">+</button>
+                    <button id="zoomOut" class="control-btn" title="Zoom Out">−</button>
+                    <button id="fitGraph" class="control-btn" title="Fit to Screen">⊡</button>
+                </div>
+            </main>
+
+            <!-- Info Panel -->
+            <aside class="info-panel">
+                <div class="panel">
+                    <h2>Selection Details</h2>
+                    <div id="selectionInfo">
+                        <p class="help-text">Click on a node or edge to view details</p>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h2>Statistics</h2>
+                    <div id="graphStats">
+                        <div class="stat-item">
+                            <span class="stat-label">Nodes:</span>
+                            <span id="nodeCount" class="stat-value">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Edges:</span>
+                            <span id="edgeCount" class="stat-value">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Selected:</span>
+                            <span id="selectedCount" class="stat-value">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h2>Actions</h2>
+                    <div id="nodeActions" style="display: none;">
+                        <button id="enrichNode" class="btn btn-primary">🔍 Enrich Entity</button>
+                        <button id="expandNode" class="btn btn-secondary">Expand Connections</button>
+                        <button id="hideNode" class="btn btn-secondary">Hide Node</button>
+                        <button id="deleteNode" class="btn btn-danger">Delete Node</button>
+                    </div>
+                    <div id="enrichmentStatus" style="margin-top: 0.5rem; font-size: 0.75rem;"></div>
+                </div>
+
+                <div class="panel">
+                    <h2>Legend</h2>
+                    <div class="legend">
+                        <div class="legend-item">
+                            <span class="legend-color" style="background: #e74c3c;"></span>
+                            <span>IP Address</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color" style="background: #3498db;"></span>
+                            <span>Domain</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color" style="background: #2ecc71;"></span>
+                            <span>File Hash</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color" style="background: #9b59b6;"></span>
+                            <span>Malware</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color" style="background: #e67e22;"></span>
+                            <span>Threat Actor</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color" style="background: #f39c12;"></span>
+                            <span>Vulnerability</span>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>⚙️ Settings</h2>
+                <button id="closeSettings" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <h3>Enrichment API Keys</h3>
+                <p class="help-text">Configure API keys for automatic threat intelligence enrichment. Keys are stored locally in your browser.</p>
+                
+                <div class="form-group">
+                    <label for="apiKeyVT">VirusTotal API Key:</label>
+                    <input type="password" id="apiKeyVT" placeholder="Enter your VirusTotal API key">
+                    <small class="help-text">Get your key from <a href="https://www.virustotal.com/gui/my-apikey" target="_blank">virustotal.com</a></small>
+                </div>
+
+                <div class="form-group">
+                    <label for="apiKeyAbuseIPDB">AbuseIPDB API Key:</label>
+                    <input type="password" id="apiKeyAbuseIPDB" placeholder="Enter your AbuseIPDB API key">
+                    <small class="help-text">Get your key from <a href="https://www.abuseipdb.com/api" target="_blank">abuseipdb.com</a></small>
+                </div>
+
+                <div class="form-group">
+                    <label for="apiKeyShodan">Shodan API Key (Optional):</label>
+                    <input type="password" id="apiKeyShodan" placeholder="Enter your Shodan API key">
+                    <small class="help-text">Get your key from <a href="https://account.shodan.io/" target="_blank">shodan.io</a></small>
+                </div>
+
+                <div class="form-group">
+                    <label for="apiKeyURLScan">URLScan API Key (Optional):</label>
+                    <input type="password" id="apiKeyURLScan" placeholder="Enter your URLScan API key">
+                    <small class="help-text">Get your key from <a href="https://urlscan.io/user/profile/" target="_blank">urlscan.io</a></small>
+                </div>
+
+                <h3 style="margin-top: 1.5rem;">Free Enrichment Sources</h3>
+                <p class="help-text">These sources work without API keys:</p>
+                <ul class="help-text" style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                    <li>IP-API (GeoIP)</li>
+                    <li>URLhaus (malicious URL database)</li>
+                    <li>MalwareBazaar (malware samples)</li>
+                    <li>NVD (CVE database)</li>
+                </ul>
+
+                <button id="saveSettings" class="btn btn-primary" style="margin-top: 1rem;">Save Settings</button>
+                <button id="clearApiKeys" class="btn btn-secondary" style="margin-top: 1rem; margin-left: 0.5rem;">Clear All Keys</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden file input for import -->
+    <input type="file" id="fileInput" accept=".json" style="display: none;">
+
+    <!-- Scripts -->
+    <script type="module" src="app.js"></script>
+</body>
+</html>
