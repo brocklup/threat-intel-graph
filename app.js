@@ -59,7 +59,6 @@ class ThreatIntelApp {
                 });
                 
                 this.graphEngine.loadFromThreatGraph();
-                console.log('Loaded saved graph data:', data.entities.length, 'entities,', data.relationships.length, 'relationships');
             }
         } catch (error) {
             console.warn('No saved data to load:', error);
@@ -184,6 +183,291 @@ class ThreatIntelApp {
         this.graphEngine.cy.on('tap', () => {
             this.updateSelectionInfo();
         });
+
+        // Context menu event handlers
+        this.setupContextMenu();
+
+        // Modal handlers
+        this.setupModals();
+    }
+
+    setupContextMenu() {
+        // Context menu item click handlers
+        document.querySelectorAll('.context-menu-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                const action = e.currentTarget.dataset.action;
+                const node = this.graphEngine.getContextNode();
+                
+                if (node) {
+                    this.handleContextMenuAction(action, node);
+                }
+                
+                this.graphEngine.hideContextMenu();
+            });
+        });
+
+        // Hide context menu when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.context-menu') && !e.target.closest('#cy')) {
+                this.graphEngine.hideContextMenu();
+            }
+        });
+    }
+
+    setupModals() {
+        // Create Link Modal
+        document.getElementById('closeCreateLink').addEventListener('click', () => {
+            document.getElementById('createLinkModal').style.display = 'none';
+        });
+
+        document.getElementById('cancelCreateLink').addEventListener('click', () => {
+            document.getElementById('createLinkModal').style.display = 'none';
+        });
+
+        document.getElementById('confirmCreateLink').addEventListener('click', () => {
+            this.handleCreateLinkConfirm();
+        });
+
+        // Edit Notes Modal
+        document.getElementById('closeEditNotes').addEventListener('click', () => {
+            document.getElementById('editNotesModal').style.display = 'none';
+        });
+
+        document.getElementById('cancelNotes').addEventListener('click', () => {
+            document.getElementById('editNotesModal').style.display = 'none';
+        });
+
+        document.getElementById('saveNotes').addEventListener('click', () => {
+            this.handleSaveNotes();
+        });
+
+        // Close modals on background click
+        document.getElementById('createLinkModal').addEventListener('click', (e) => {
+            if (e.target.id === 'createLinkModal') {
+                document.getElementById('createLinkModal').style.display = 'none';
+            }
+        });
+
+        document.getElementById('editNotesModal').addEventListener('click', (e) => {
+            if (e.target.id === 'editNotesModal') {
+                document.getElementById('editNotesModal').style.display = 'none';
+            }
+        });
+    }
+
+    async handleContextMenuAction(action, node) {
+        const nodeId = node.data('id');
+        const entity = this.threatGraph.getEntity(nodeId);
+
+        if (!entity) return;
+
+        switch (action) {
+            case 'enrich-all':
+                await this.enrichFromAllSources(entity, node);
+                break;
+            case 'enrich-virustotal':
+                await this.enrichFromSource(entity, node, 'virustotal');
+                break;
+            case 'enrich-abuseipdb':
+                await this.enrichFromSource(entity, node, 'abuseipdb');
+                break;
+            case 'edit-notes':
+                this.showEditNotesModal(entity);
+                break;
+            case 'create-link':
+                this.showCreateLinkModal(entity);
+                break;
+            case 'expand':
+                this.graphEngine.expandNode(node);
+                break;
+            case 'hide':
+                node.style('display', 'none');
+                break;
+            case 'delete':
+                await this.deleteEntityFromContext(nodeId);
+                break;
+        }
+    }
+
+    async enrichFromAllSources(entity, node) {
+        const statusDiv = document.getElementById('enrichmentStatus');
+        statusDiv.textContent = `Enriching ${entity.value} from all sources...`;
+        statusDiv.className = 'loading';
+        statusDiv.style.display = 'block';
+
+        try {
+            const enrichmentData = await this.enrichmentEngine.enrichEntity(entity);
+
+            entity.metadata.enrichment = enrichmentData;
+            entity.metadata.enriched = true;
+            entity.metadata.enrichmentTimestamp = enrichmentData.timestamp;
+
+            await this.storage.saveEntity(entity);
+            node.data('metadata', entity.metadata);
+            this.updateSelectionInfo();
+
+            const sourcesText = enrichmentData.sources?.length > 0 
+                ? enrichmentData.sources.join(', ') 
+                : 'No sources';
+            statusDiv.textContent = `✓ Enriched from: ${sourcesText}`;
+            statusDiv.className = 'success';
+
+            node.addClass('enriched');
+
+            setTimeout(() => {
+                statusDiv.style.display = 'none';
+            }, 5000);
+
+        } catch (error) {
+            console.error('Enrichment error:', error);
+            statusDiv.textContent = `✗ Enrichment failed: ${error.message}`;
+            statusDiv.className = 'error';
+
+            setTimeout(() => {
+                statusDiv.style.display = 'none';
+            }, 5000);
+        }
+    }
+
+    async enrichFromSource(entity, node, source) {
+        const statusDiv = document.getElementById('enrichmentStatus');
+        statusDiv.textContent = `Enriching ${entity.value} from ${source}...`;
+        statusDiv.className = 'loading';
+        statusDiv.style.display = 'block';
+
+        try {
+            // Call enrichment for specific source
+            const enrichmentData = await this.enrichmentEngine.enrichEntity(entity);
+
+            entity.metadata.enrichment = enrichmentData;
+            entity.metadata.enriched = true;
+            entity.metadata.enrichmentTimestamp = enrichmentData.timestamp;
+
+            await this.storage.saveEntity(entity);
+            node.data('metadata', entity.metadata);
+            this.updateSelectionInfo();
+
+            statusDiv.textContent = `✓ Enriched from ${source}`;
+            statusDiv.className = 'success';
+
+            node.addClass('enriched');
+
+            setTimeout(() => {
+                statusDiv.style.display = 'none';
+            }, 5000);
+
+        } catch (error) {
+            console.error('Enrichment error:', error);
+            statusDiv.textContent = `✗ ${source} enrichment failed`;
+            statusDiv.className = 'error';
+
+            setTimeout(() => {
+                statusDiv.style.display = 'none';
+            }, 5000);
+        }
+    }
+
+    showEditNotesModal(entity) {
+        const modal = document.getElementById('editNotesModal');
+        document.getElementById('notesEntityName').textContent = entity.value;
+        
+        // Load existing notes and tags
+        document.getElementById('entityNotes').value = entity.metadata.notes || '';
+        document.getElementById('entityTags').value = entity.metadata.tags?.join(', ') || '';
+        
+        // Store current entity ID for later
+        modal.dataset.entityId = entity.id;
+        
+        modal.style.display = 'flex';
+    }
+
+    async handleSaveNotes() {
+        const modal = document.getElementById('editNotesModal');
+        const entityId = modal.dataset.entityId;
+        const entity = this.threatGraph.getEntity(entityId);
+
+        if (!entity) return;
+
+        const notes = document.getElementById('entityNotes').value.trim();
+        const tagsInput = document.getElementById('entityTags').value.trim();
+        const tags = tagsInput ? tagsInput.split(',').map(t => t.trim()).filter(t => t) : [];
+
+        entity.metadata.notes = notes;
+        entity.metadata.tags = tags;
+
+        await this.storage.saveEntity(entity);
+
+        // Update the node data
+        const node = this.graphEngine.cy.getElementById(entityId);
+        if (node.length > 0) {
+            node.data('metadata', entity.metadata);
+        }
+
+        this.updateSelectionInfo();
+
+        modal.style.display = 'none';
+    }
+
+    showCreateLinkModal(entity) {
+        const modal = document.getElementById('createLinkModal');
+        document.getElementById('linkSourceName').textContent = entity.value;
+        
+        // Populate target dropdown with all other entities
+        const linkTarget = document.getElementById('linkTarget');
+        linkTarget.innerHTML = '<option value="">Select target...</option>';
+        
+        for (const otherEntity of this.threatGraph.entities.values()) {
+            if (otherEntity.id !== entity.id) {
+                const option = document.createElement('option');
+                option.value = otherEntity.id;
+                option.textContent = `${ENTITY_TYPES[otherEntity.type].label}: ${otherEntity.value}`;
+                linkTarget.appendChild(option);
+            }
+        }
+        
+        // Store source entity ID
+        modal.dataset.sourceId = entity.id;
+        
+        modal.style.display = 'flex';
+    }
+
+    async handleCreateLinkConfirm() {
+        const modal = document.getElementById('createLinkModal');
+        const sourceId = modal.dataset.sourceId;
+        const targetId = document.getElementById('linkTarget').value;
+        const relType = document.getElementById('linkRelType').value;
+
+        if (!targetId) {
+            alert('Please select a target entity');
+            return;
+        }
+
+        try {
+            const relationship = new ThreatRelationship(null, sourceId, targetId, relType);
+            this.threatGraph.addRelationship(relationship);
+            this.graphEngine.addEdge(relationship);
+            
+            await this.storage.saveRelationship(relationship);
+
+            this.updateStats();
+
+            modal.style.display = 'none';
+        } catch (error) {
+            alert(`Error creating link: ${error.message}`);
+        }
+    }
+
+    async deleteEntityFromContext(nodeId) {
+        if (confirm(`Are you sure you want to delete this entity and all its connections?`)) {
+            this.threatGraph.removeEntity(nodeId);
+            this.graphEngine.removeNode(nodeId);
+            
+            await this.storage.deleteEntity(nodeId);
+
+            this.updateNodeDropdowns();
+            this.updateStats();
+            this.updateSelectionInfo();
+        }
     }
 
     handleAddEntity() {
@@ -197,7 +481,6 @@ class ThreatIntelApp {
             return;
         }
 
-        console.log('Creating entity:', type, value);
         statusDiv.textContent = 'Creating entity...';
         statusDiv.style.color = '#3498db';
 
@@ -205,17 +488,14 @@ class ThreatIntelApp {
             description: description || `${ENTITY_TYPES[type].label}: ${value}`
         });
 
-        console.log('Entity created:', entity);
         statusDiv.textContent = 'Entity created, adding to graph...';
 
         // Add to threat graph model
         this.threatGraph.addEntity(entity);
-        console.log('Entity added to graph model. Total entities:', this.threatGraph.entities.size);
         statusDiv.textContent = `Added to model (${this.threatGraph.entities.size} total)`;
         
         // Add to visualization
         this.graphEngine.addNode(entity);
-        console.log('Entity added to visualization');
         statusDiv.textContent = 'Added to visualization!';
         statusDiv.style.color = '#2ecc71';
         
@@ -233,8 +513,6 @@ class ThreatIntelApp {
         // Clear form
         document.getElementById('entityValue').value = '';
         document.getElementById('entityDescription').value = '';
-
-        console.log('✅ Successfully added entity:', entity.value);
         
         // Clear status after 3 seconds
         setTimeout(() => {
@@ -267,8 +545,6 @@ class ThreatIntelApp {
 
             // Update stats
             this.updateStats();
-
-            console.log('Added relationship:', relationship);
         } catch (error) {
             alert(`Error adding relationship: ${error.message}`);
         }
@@ -328,8 +604,6 @@ class ThreatIntelApp {
         // Update UI
         this.updateNodeDropdowns();
         this.updateStats();
-
-        console.log('Loaded sample data:', entities.length, 'entities,', relationships.length, 'relationships');
     }
 
     async clearGraph() {
@@ -340,8 +614,6 @@ class ThreatIntelApp {
         this.updateNodeDropdowns();
         this.updateStats();
         this.updateSelectionInfo();
-
-        console.log('Graph cleared');
     }
 
     async exportData() {
@@ -357,8 +629,6 @@ class ThreatIntelApp {
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-
-            console.log('Exported graph data');
         } catch (error) {
             alert(`Export failed: ${error.message}`);
         }
@@ -378,7 +648,6 @@ class ThreatIntelApp {
             this.updateStats();
 
             alert('Data imported successfully');
-            console.log('Imported graph data from file');
         } catch (error) {
             alert(`Import failed: ${error.message}`);
         }
@@ -587,12 +856,8 @@ class ThreatIntelApp {
         statusDiv.className = 'loading';
         statusDiv.style.display = 'block';
 
-        console.log('Enriching entity:', entity);
-
         try {
             const enrichmentData = await this.enrichmentEngine.enrichEntity(entity);
-            
-            console.log('Enrichment completed:', enrichmentData);
 
             // Update entity metadata with enrichment data
             entity.metadata.enrichment = enrichmentData;
@@ -663,8 +928,6 @@ class ThreatIntelApp {
         
         alert('Settings saved successfully!');
         this.closeSettings();
-        
-        console.log('API keys saved (keys hidden for security)');
     }
 
     clearApiKeys() {
@@ -681,7 +944,6 @@ class ThreatIntelApp {
         document.getElementById('apiKeyURLScan').value = '';
 
         alert('All API keys cleared');
-        console.log('API keys cleared');
     }
 }
 

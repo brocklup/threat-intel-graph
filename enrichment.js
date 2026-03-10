@@ -45,7 +45,6 @@ export class EnrichmentEngine {
         
         // Check cache first
         if (this.enrichmentCache.has(cacheKey)) {
-            console.log('Using cached enrichment for:', entity.value);
             return this.enrichmentCache.get(cacheKey);
         }
 

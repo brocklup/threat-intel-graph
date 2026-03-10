@@ -13,8 +13,6 @@ export class GraphEngine {
     }
 
     init() {
-        console.log('Initializing GraphEngine with container:', this.container);
-        
         if (!this.container) {
             console.error('Container element not found!');
             return;
@@ -24,7 +22,6 @@ export class GraphEngine {
         if (typeof cytoscape !== 'undefined' && typeof cola !== 'undefined' && cytoscape('layout', 'cola') === undefined) {
             try {
                 cytoscape.use(cytoscapeCola);
-                console.log('Cola layout extension registered');
             } catch (error) {
                 console.warn('Could not register cola layout:', error);
             }
@@ -147,7 +144,6 @@ export class GraphEngine {
             wheelSensitivity: 0.5
         });
 
-        console.log('Cytoscape initialized successfully. Nodes:', this.cy.nodes().length);
         this.setupEventHandlers();
     }
 
@@ -172,10 +168,55 @@ export class GraphEngine {
             this.expandNode(node);
         });
 
-        // Context menu prevention
-        this.cy.on('cxttap', (event) => {
+        // Right-click context menu for nodes
+        this.cy.on('cxttap', 'node', (event) => {
             event.preventDefault();
+            const node = event.target;
+            const renderedPosition = event.renderedPosition || event.position;
+            this.showContextMenu(node, renderedPosition.x, renderedPosition.y);
         });
+
+        // Right-click on background - close context menu
+        this.cy.on('cxttap', (event) => {
+            if (event.target === this.cy) {
+                this.hideContextMenu();
+            }
+        });
+
+        // Hide context menu on any tap
+        this.cy.on('tap', () => {
+            this.hideContextMenu();
+        });
+    }
+
+    showContextMenu(node, x, y) {
+        const menu = document.getElementById('contextMenu');
+        if (!menu) return;
+
+        // Store the context node
+        this.contextNode = node;
+
+        // Position the menu at the click location
+        menu.style.left = `${x}px`;
+        menu.style.top = `${y}px`;
+        menu.style.display = 'block';
+
+        // Emit custom event that app.js can listen to
+        document.dispatchEvent(new CustomEvent('contextMenuShown', {
+            detail: { node, menuElement: menu }
+        }));
+    }
+
+    hideContextMenu() {
+        const menu = document.getElementById('contextMenu');
+        if (menu) {
+            menu.style.display = 'none';
+        }
+        this.contextNode = null;
+    }
+
+    getContextNode() {
+        return this.contextNode;
     }
 
     highlightConnected(element) {
@@ -226,15 +267,12 @@ export class GraphEngine {
     }
 
     addNode(entity) {
-        console.log('GraphEngine.addNode called with:', entity);
-        
         if (!this.cy) {
             console.error('Cytoscape not initialized!');
             return;
         }
         
         if (this.cy.getElementById(entity.id).length > 0) {
-            console.warn('Node already exists:', entity.id);
             return;
         }
 
@@ -249,17 +287,13 @@ export class GraphEngine {
             }
         };
 
-        console.log('Adding node with data:', nodeData);
         const node = this.cy.add(nodeData);
-        console.log('Node added to Cytoscape. Total nodes:', this.cy.nodes().length);
         
         // Run layout with animation to show the change
-        console.log('Applying layout...');
         this.applyLayout('cose', true);
         
         // Fit viewport to show all nodes including the new one
         setTimeout(() => {
-            console.log('Fitting viewport and highlighting new node');
             this.fit();
             // Briefly highlight the new node
             node.addClass('highlighted');
@@ -269,7 +303,6 @@ export class GraphEngine {
 
     addEdge(relationship) {
         if (this.cy.getElementById(relationship.id).length > 0) {
-            console.warn('Edge already exists:', relationship.id);
             return;
         }
 
@@ -331,7 +364,6 @@ export class GraphEngine {
     applyLayout(layoutName, animate = true) {
         // Default to cose if cola/force-directed is requested but not available
         if (layoutName === 'cola' && typeof cola === 'undefined') {
-            console.warn('Cola layout not available, falling back to cose');
             layoutName = 'cose';
         }
         

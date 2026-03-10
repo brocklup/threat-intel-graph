@@ -437,3 +437,58 @@ body {
         grid-template-columns: 250px 1fr 250px;
     }
 }
+
+/* Context Menu */
+.context-menu {
+    position: fixed;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+    z-index: 10000;
+    min-width: 220px;
+    padding: 0.5rem 0;
+}
+
+.context-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    transition: background 0.2s;
+    font-size: 0.875rem;
+}
+
+.context-menu-item:hover {
+    background: var(--bg-tertiary);
+}
+
+.context-menu-item.danger:hover {
+    background: rgba(231, 76, 60, 0.2);
+    color: var(--danger-color);
+}
+
+.context-menu-item .menu-icon {
+    font-size: 1rem;
+    width: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.context-menu-separator {
+    height: 1px;
+    background: var(--border-color);
+    margin: 0.5rem 0;
+}
+
+/* Small Modal */
+.modal-small {
+    max-width: 450px;
+}
+
+.modal-small .modal-body {
+    padding: 1.25rem;
+}
+

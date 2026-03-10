@@ -246,6 +246,110 @@
     <!-- Hidden file input for import -->
     <input type="file" id="fileInput" accept=".json" style="display: none;">
 
+    <!-- Context Menu -->
+    <div id="contextMenu" class="context-menu" style="display: none;">
+        <div class="context-menu-item" data-action="enrich-all">
+            <span class="menu-icon">🔍</span>
+            <span>Enrich from All Sources</span>
+        </div>
+        <div class="context-menu-item" data-action="enrich-virustotal">
+            <span class="menu-icon">🦠</span>
+            <span>Enrich from VirusTotal</span>
+        </div>
+        <div class="context-menu-item" data-action="enrich-abuseipdb">
+            <span class="menu-icon">🚫</span>
+            <span>Enrich from AbuseIPDB</span>
+        </div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" data-action="edit-notes">
+            <span class="menu-icon">📝</span>
+            <span>Add/Edit Notes</span>
+        </div>
+        <div class="context-menu-item" data-action="create-link">
+            <span class="menu-icon">🔗</span>
+            <span>Create Link To...</span>
+        </div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" data-action="expand">
+            <span class="menu-icon">⚡</span>
+            <span>Expand Connections</span>
+        </div>
+        <div class="context-menu-item" data-action="hide">
+            <span class="menu-icon">👁️</span>
+            <span>Hide Node</span>
+        </div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item danger" data-action="delete">
+            <span class="menu-icon">🗑️</span>
+            <span>Delete Entity</span>
+        </div>
+    </div>
+
+    <!-- Create Link Modal -->
+    <div id="createLinkModal" class="modal" style="display: none;">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2>Create Link</h2>
+                <button id="closeCreateLink" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="help-text">Create a relationship from <strong id="linkSourceName"></strong> to:</p>
+                
+                <div class="form-group">
+                    <label for="linkRelType">Relationship Type:</label>
+                    <select id="linkRelType" required>
+                        <option value="communicates-with">Communicates With</option>
+                        <option value="resolves-to">Resolves To</option>
+                        <option value="downloads">Downloads</option>
+                        <option value="uses">Uses</option>
+                        <option value="exploits">Exploits</option>
+                        <option value="attributed-to">Attributed To</option>
+                        <option value="targets">Targets</option>
+                        <option value="delivers">Delivers</option>
+                        <option value="drops">Drops</option>
+                        <option value="indicates">Indicates</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="linkTarget">Target Entity:</label>
+                    <select id="linkTarget" required>
+                        <option value="">Select target...</option>
+                    </select>
+                </div>
+
+                <button id="confirmCreateLink" class="btn btn-primary" style="margin-top: 1rem;">Create Link</button>
+                <button id="cancelCreateLink" class="btn btn-secondary" style="margin-top: 1rem; margin-left: 0.5rem;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Notes Modal -->
+    <div id="editNotesModal" class="modal" style="display: none;">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2>Edit Notes</h2>
+                <button id="closeEditNotes" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="help-text">Notes for <strong id="notesEntityName"></strong></p>
+                
+                <div class="form-group">
+                    <label for="entityNotes">Notes:</label>
+                    <textarea id="entityNotes" rows="6" placeholder="Add your investigation notes here..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="entityTags">Tags (comma-separated):</label>
+                    <input type="text" id="entityTags" placeholder="e.g., malicious, c2, suspicious">
+                </div>
+
+                <button id="saveNotes" class="btn btn-primary" style="margin-top: 1rem;">Save Notes</button>
+                <button id="cancelNotes" class="btn btn-secondary" style="margin-top: 1rem; margin-left: 0.5rem;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script type="module" src="app.js"></script>
 </body>
